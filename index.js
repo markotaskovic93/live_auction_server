@@ -1,53 +1,52 @@
-const express = require('express')
-const path = require('path')
-const socketio =  require('socket.io')
-const http = require('http')
+const webSocketsServerPort = 8000;
+const webSocketServer = require('websocket').server;
+const http = require('http');
+// Spinning the http server and the websocket server.
+const server = http.createServer();
+server.listen(webSocketsServerPort);
 
-const SERVER_PORT = process.env.PORT || 3333
-
-const app = express();
-const server = http.createServer(app)
-const io = socketio(server)
-
-let usersockets = {}
-
-app.use(function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  next();
+const wsServer = new webSocketServer({
+  httpServer: server
 });
 
-app.listen(SERVER_PORT, () => console.log('Website started on http://localhost:3333'));
+// I'm maintaining all active connections in this object
+const clients = {};
 
-app.get("/", (req, res) => {
-    res.send("marko je pajser");
+// This code generates unique userid for everyuser.
+const getUniqueID = () => {
+  const s4 = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+  return s4() + s4() + '-' + s4();
+};
+
+wsServer.on('request', function(request) {
+  var userID = getUniqueID();
+
+
+  // You can rewrite this part of the code to accept only the requests from allowed origin
+  const connection = request.accept(null, request.origin);
+  clients[userID] = connection;
+
+  connection.on("message", (message) => {
+    if(message.type === "utf8"){
+      var message = JSON.parse(message.utf8Data);
+      
+      connection.send(JSON.stringify({
+          type: "getAllPendingProducts",
+          msg: "Poruka primljena",
+          user: "Marko Taskovic"
+      }));
+    }
+  });
 });
 
-//app.use('/', express.static(path.join(__dirname, 'src')));
 
-io.on('connection', (socket) => {
-    console.log("New Socket formed from " + socket.id);
-    socket.emit('connected', {
-        marko: "Napusis mi se sa kurac"
-    })
-    socket.on('login', (data) => {
-        //username is in data.user
-        usersockets[data.user] = socket.id
-        console.log(usersockets)
-    })
-    // listener on the socket
-    socket.on('send_msg', (data) => {
-        //socket.broadcast only other will get it
-        if (data.message.startsWith('@')) {
-            let recipient = data.message.split(':')[0].substr(1)
-            let rcpSocket = usersockets[recipient]
-            io.to(rcpSocket).emit('recv_msg', data)
-        } else {
-            socket.broadcast.emit('recv_msg', data)   //io.emit means every socket which is connected will get the msg
-        }
-        socket.emit('sad', "sve li ti jebem");
-    })
-})
+
+
+
+
+
+
+
 
 
 
