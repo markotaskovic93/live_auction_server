@@ -1,55 +1,30 @@
-const webSocketsServerPort = 8000;
-const webSocketServer = require('websocket').server;
-const http = require('http');
-// Spinning the http server and the websocket server.
-const server = http.createServer();
-server.listen(webSocketsServerPort);
+const http = require("http")
+const express = require("express")
+const socketio = require("socket.io")
 
-const wsServer = new webSocketServer({
-  httpServer: server
-});
+const PORT = process.env.PORT || 5000
 
-// I'm maintaining all active connections in this object
-const clients = {};
+const app = express()
+const server = http.createServer(app)
 
-// This code generates unique userid for everyuser.
-const getUniqueID = () => {
-  const s4 = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
-  return s4() + s4() + '-' + s4();
-};
+const io = socketio(server, {
+  cors: {
+    origin: "*",
+  },
+})
 
-wsServer.on('request', function(request) {
-  var userID = getUniqueID();
+io.on("connect", (socket) => {
+  console.log("someone connected")
+  socket.emit("connected") //handle new connection
 
+  socket.on("new_message", (messageData) => {
+    console.log(messageData)
+    io.emit("message", messageData)
+  })
 
-  // You can rewrite this part of the code to accept only the requests from allowed origin
-  const connection = request.accept(null, request.origin);
-  clients[userID] = connection;
+  socket.on("disconnect", () => {
+    console.log("user disconnected")
+  })
+})
 
-  connection.on("message", (message) => {
-    if(message.type === "utf8"){
-      var message = JSON.parse(message.utf8Data);
-      
-      connection.send(JSON.stringify({
-          type: "getAllPendingProducts",
-          msg: "Poruka primljena",
-          user: "Marko Taskovic"
-      }));
-    }
-  });
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+server.listen(PORT, () => console.log(`listening to port ${PORT}`))
